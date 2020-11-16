@@ -5,7 +5,6 @@ use rusoto_iam::{Iam,IamClient,CreateAccessKeyRequest,DeleteAccessKeyRequest};
 use tokio;
 use configparser::ini::Ini;
 use std::env;
-use std::ffi::OsString;
 
 fn expand_tilde<P: AsRef<Path>>(path_user_input: P) -> Option<PathBuf> {
     let p = path_user_input.as_ref();
@@ -34,8 +33,8 @@ async fn main() {
         .about("Simple tool to rotate AWS token: create and save new credentials and drop old ones.\n\nUse AWS_SHARED_CREDENTIALS_FILE or AWS_PROFILE envvars if needed")
         .get_matches();
 
-    let credential_path = expand_tilde(env::var_os("AWS_SHARED_CREDENTIALS_FILE").unwrap_or(OsString::from("~/.aws/credentials")).into_string().unwrap()).unwrap();
-    let profile = env::var_os("AWS_PROFILE").unwrap_or(OsString::from("default")).into_string().unwrap();
+    let credential_path = expand_tilde(env::var("AWS_SHARED_CREDENTIALS_FILE").unwrap_or(String::from("~/.aws/credentials"))).expect("Fail to get credential file path");
+    let profile = env::var("AWS_PROFILE").unwrap_or(String::from("default"));
     // Create client with old key
     let region = Region::UsEast1;
     let client = IamClient::new(region);
@@ -44,23 +43,17 @@ async fn main() {
     // Change default section name. This allows writing to a "default" section with explicit header.
     // Otherwise keys are written outside any section header.
     config.set_default_section("another_default");
-    match config.load(credential_path.to_str().unwrap()) {
-        Ok(_) => (),
-        Err(e) => panic!("Unable to load credential file. Error: {:?}", e)
-    }
-    let old_key = config.get(&profile, "aws_access_key_id").unwrap();
+    config.load(credential_path.to_str().expect("Fail to convert path to str")).expect("Unable to load credential file");
+    let old_key = config.get(&profile, "aws_access_key_id").expect("Fail to get aws_access_key_id from file for given profile");
     // Create new key
     println!("Creating new key using {}", old_key);
     let create_access_key_req : CreateAccessKeyRequest = Default::default();
-    let new_access_key = client.create_access_key(create_access_key_req).await.unwrap();
+    let new_access_key = client.create_access_key(create_access_key_req).await.expect("Fail to get new credentials");
     // update config
     config.set(&profile,"aws_access_key_id",Some(new_access_key.access_key.access_key_id));
     config.set(&profile,"aws_secret_access_key",Some(new_access_key.access_key.secret_access_key));
-    match config.write(credential_path.to_str().unwrap()) {
-        Ok(_) => (),
-        Err(e) => panic!("Unable to write credential file. Error: {:?}", e)
-    };
-    println!("Saving {} in {} profile", config.get(&profile, "aws_access_key_id").unwrap(), profile);
+    config.write(credential_path.to_str().expect("Fail to convert path to str")).expect("Unable to write credential file");
+    println!("Saving {} in {} profile", config.get(&profile, "aws_access_key_id").expect("Fail to get aws_access_key_id from config for given profile"), profile);
     // Recreate client with to use new credentials
     let region = Region::UsEast1;
     let client = IamClient::new(region);
@@ -72,7 +65,6 @@ async fn main() {
     };
     match client.delete_access_key(delete_access_key_req).await {
         Ok(_) => println!("Done"),
-        Err(e) => println!("Error deleting key: {:?}", e)
+        Err(e) => panic!("Error deleting key: {:?}", e)
     }
-
 }

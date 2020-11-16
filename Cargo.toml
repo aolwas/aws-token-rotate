@@ -1,6 +1,6 @@
 [package]
 name = "aws-token-rotate"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Maxime Cottret <maxime.cottret@gmail.com>"]
 edition = "2018"
 
