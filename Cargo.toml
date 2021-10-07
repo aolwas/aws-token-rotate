@@ -1,8 +1,14 @@
 [package]
 name = "aws-token-rotate"
-version = "1.0.1"
+description = "Simple tool to rotate AWS token"
+version = "1.0.2"
 authors = ["Maxime Cottret <maxime.cottret@gmail.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/aolwas/aws-token-rotate.git"
+readme = "README.md"
+keywords = ["AWS", "IAM"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
