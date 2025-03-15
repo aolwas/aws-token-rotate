@@ -3,7 +3,8 @@ name = "aws-token-rotate"
 description = "Simple tool to rotate AWS token"
 version = "1.0.5"
 authors = ["Maxime Cottret <maxime.cottret@gmail.com>"]
-edition = "2018"
+edition = "2024"
+rust-version = "1.85.0"
 license = "MIT"
 repository = "https://github.com/aolwas/aws-token-rotate.git"
 readme = "README.md"
@@ -13,10 +14,12 @@ categories = ["command-line-utilities"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dirs = "3.0"
-clap = "3.1.18"
-openssl = { version = "0.10", features = ["vendored"] }
-rusoto_core = "0.48"
-rusoto_iam = "0.48"
-tokio = { version = "1", features = ["sync"] }
-configparser = "1.0"
+aws-config = { version = "1.6.0", features = [
+    "behavior-version-latest",
+    "rustls",
+] }
+aws-sdk-iam = "1.65.0"
+dirs = "6.0"
+clap = "4.5"
+tokio = { version = "1", features = ["full"] }
+configparser = { version = "3.1.0" }

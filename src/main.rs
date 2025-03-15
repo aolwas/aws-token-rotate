@@ -1,7 +1,7 @@
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_iam::Client as iamClient;
 use clap::Command;
 use configparser::ini::Ini;
-use rusoto_core::Region;
-use rusoto_iam::{CreateAccessKeyRequest, DeleteAccessKeyRequest, Iam, IamClient};
 use std::env;
 use std::path::{Path, PathBuf};
 use tokio;
@@ -39,8 +39,14 @@ async fn main() {
     .expect("Fail to get credential file path");
     let profile = env::var("AWS_PROFILE").unwrap_or(String::from("default"));
     // Create client with old key
-    let region = Region::UsEast1;
-    let client = IamClient::new(region);
+    let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+    let config = aws_config::from_env()
+        .profile_name(&profile)
+        .region(region_provider)
+        .load()
+        .await;
+    let client = iamClient::new(&config);
+
     // Load profile as ini and get access_key
     let mut config = Ini::new();
     // Change default section name. This allows writing to a "default" section with explicit header.
@@ -58,46 +64,57 @@ async fn main() {
         .expect("Fail to get aws_access_key_id from file for given profile");
     // Create new key
     println!("Creating new key using {}", old_key);
-    let create_access_key_req: CreateAccessKeyRequest = Default::default();
     let new_access_key = client
-        .create_access_key(create_access_key_req)
+        .create_access_key()
+        .send()
         .await
         .expect("Fail to get new credentials");
     // update config
-    config.set(
-        &profile,
-        "aws_access_key_id",
-        Some(new_access_key.access_key.access_key_id),
-    );
-    config.set(
-        &profile,
-        "aws_secret_access_key",
-        Some(new_access_key.access_key.secret_access_key),
-    );
-    config
-        .write(
-            credential_path
-                .to_str()
-                .expect("Fail to convert path to str"),
-        )
-        .expect("Unable to write credential file");
-    println!(
-        "Saving {} in {} profile",
-        config
-            .get(&profile, "aws_access_key_id")
-            .expect("Fail to get aws_access_key_id from config for given profile"),
-        profile
-    );
+    match new_access_key.access_key {
+        Some(keys) => {
+            config.set(&profile, "aws_access_key_id", Some(keys.access_key_id));
+
+            config.set(
+                &profile,
+                "aws_secret_access_key",
+                Some(keys.secret_access_key),
+            );
+            config
+                .write(
+                    credential_path
+                        .to_str()
+                        .expect("Fail to convert path to str"),
+                )
+                .expect("Unable to write credential file");
+            println!(
+                "Saving {} in {} profile",
+                config
+                    .get(&profile, "aws_access_key_id")
+                    .expect("Fail to get aws_access_key_id from config for given profile"),
+                profile
+            );
+        }
+        None => {
+            panic!("Empty new credentials, aborting");
+        }
+    }
+
     // Recreate client with to use new credentials
-    let region = Region::UsEast1;
-    let client = IamClient::new(region);
+    let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+    let config = aws_config::from_env()
+        .profile_name(&profile)
+        .region(region_provider)
+        .load()
+        .await;
+    let client = iamClient::new(&config);
     // delete old key
     println!("Deleting {}", old_key);
-    let delete_access_key_req = DeleteAccessKeyRequest {
-        access_key_id: old_key,
-        user_name: None,
-    };
-    match client.delete_access_key(delete_access_key_req).await {
+    match client
+        .delete_access_key()
+        .set_access_key_id(Some(old_key))
+        .send()
+        .await
+    {
         Ok(_) => println!("Done"),
         Err(e) => panic!("Error deleting key: {:?}", e),
     }
