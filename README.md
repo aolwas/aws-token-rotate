@@ -7,7 +7,11 @@ to specify alternative file and/or profile.
 
 # Installation
 
-This package has only been tested on Ubuntu and Debian Linux OS.
+This package has only been tested on Ubuntu/Debian Linux OS and MacOS.
+
+## Releases
+
+Pre-built binaries are provided for Linux and MacOS, both in x86_64 and aarch64 variants
 
 ## Cargo
 
